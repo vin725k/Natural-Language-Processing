@@ -1,0 +1,311 @@
+---
+title: "SA Assignment"
+output: html_document
+Author: Balaji Venktesh(11910041),Gireesh Sundaram (11910063),Vineet Kapoor(11910076)
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+##Installing required packages
+library(wordcloud)
+library(tm)
+library(tidytext)
+library(dplyr)
+library(tidyverse)
+library(ggraph)
+library(igraph)
+library(qdap)
+library(lexicon)
+library(stringi)
+```
+
+
+
+```{r}
+##sourcing DTM function for unigrams from github
+source("https://raw.githubusercontent.com/balajivenky06/TextMininginR/master/CreateDTM.R")
+
+```
+
+
+```{r}
+
+##sourcing DTM function for bigrams from github
+source("https://raw.githubusercontent.com/balajivenky06/TextMininginR/master/CreateBigram.R")
+
+```
+
+```{r}
+### Creating loops for all RDS files and creating unigrams DTM
+years = 2005:2014
+
+for (year  in years){
+  df_uni = readRDS(paste0('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\TABA Tutorial 29042018\\bd.df.30firms.',year,'.Rds'))
+  text2  = df_uni$bd.text
+  dtm = createDTM(text2)
+  saveRDS(dtm,paste0('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\TABA Tutorial 29042018\\df_',year,'.Rds'))
+}
+
+```
+
+```{r}
+### Creating loops for all RDS files and creating bigrams DTM
+
+years = 2005:2014
+for (year  in years){
+  dfbigrams1 = readRDS(paste0('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\TABA Tutorial 29042018\\bd.df.30firms.',year,'.Rds'))
+  text3  = dfbigrams1$bd.text
+  dtm_bi = text_bigrams(text3)
+  saveRDS(dtm_bi,paste0('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\TABA Tutorial 29042018\\df_bigrams_',year,'.Rds'))
+}
+
+```
+
+
+```{r}
+
+#Inference - Names of all the technology firms and their products , business roles, customers are coming in this wordcloud. Oracle , Services are the terms used frequently
+
+dtm %>%
+  with(wordcloud(word, n, max.words = 100))
+```
+
+
+
+```{r}
+
+### Wordcloud of Sentiments in new  products launched by firms 
+# Positive and negative sentiments words are present in this word cloud. Thi shows that many companies products have negative and positive sentiments.
+library(reshape2)
+
+dtm %>%
+  inner_join(get_sentiments("nrc")) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "nn", fill = 0) %>%
+  comparison.cloud(colors = c("gray20", "gray80"),
+                   max.words = 100)
+```
+
+
+```{r}
+
+####Data visualization of Unigrams in the DTM
+# This Bar plot shows that most of the firms are Services providing companies and related to business. Cloud, Oracle , data , storage are the most frequently used terms. It shows that most companies are using Oracle and cloud services for their business.
+
+head(dtm)
+library(ggplot2)
+dtm %>% filter(n > 100) %>% mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) + geom_col() + xlab(NULL) + coord_flip() 
+```
+
+
+```{r}
+### Data Visualization using ggplot of sentiments related to joy in DTM.
+
+nrc_joy <- get_sentiments("nrc") %>% 
+  filter(sentiment == "joy")
+
+dtm1 <- dtm %>%
+  inner_join(nrc_joy) %>% filter(n > 5)
+
+head(dtm1)
+ 
+library(ggplot2)
+
+ggplot(dtm1, aes(word, sentiment, fill = word)) +
+  geom_col(show.legend = FALSE)  + coord_flip() 
+
+```
+
+
+```{r}
+###Co-occurence graph of all bigrams in DTM 
+
+str(dtm_bi)
+
+library(tidyr)
+bigrams_separated <- dtm_bi %>% separate(bigram, c("word1", "word2"), sep = " ")
+
+set.seed(2016)
+a <- grid::arrow(type = "closed", length = unit(.15, "inches"))
+  
+dtm_bi %>% 
+graph_from_data_frame() %>%
+ggraph(layout = "fr") +
+geom_edge_link(aes(edge_alpha = n), show.legend = FALSE, arrow = a) +
+geom_node_point(color = "lightblue", size = 5) +
+geom_node_text(aes(label = name), vjust = 1, hjust = 1) +
+theme_void()
+
+
+```
+
+```{r}
+##sourcing DTM function for one bigram from github
+source("https://raw.githubusercontent.com/vin725k/Data-Collection-using-R-and-Python/master/bigrams_dtm.R")
+
+```
+
+
+```{r}
+###Taking only 1 RDS file and creating DTM for Bigrams for it
+d2005 = readRDS('C:/Users/Vineet/Documents/ISB-H/TA/GP/bd.df.30firms.2005.rds')
+text1  = d2005$bd.text
+dtm1 <-text_big(text1)
+ncol(dtm1)
+
+```
+
+
+
+```{r}
+
+#########  Barchart only for one DTM
+plot.barchart <- function(dtm, num_tokens=15, fill_color="Blue")
+{
+  a0 = apply(dtm, 2, sum)
+  a1 = order(a0, decreasing = TRUE)
+  tsum = a0[a1]
+  
+  # plot barchart for top tokens
+  test = as.data.frame(round(tsum[1:num_tokens],0))
+  
+  # windows()  # New plot window
+  require(ggplot2)
+  p = ggplot(test, aes(x = rownames(test), y = test)) + 
+    geom_bar(stat = "identity", fill = fill_color) +
+    geom_text(aes(label = test), vjust= -0.20) + 
+    theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  
+  plot(p) }  # func ends
+
+plot.barchart(dtm1)
+
+
+```
+
+```{r}
+##finding new words from unigrams##
+d1 = as.matrix(readRDS('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\df2005.Rds')) 
+d2 = as.matrix(readRDS('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\df2006.Rds'))
+d11 = d1[,colSums(d1) > 0]
+d22 = d2[,colSums(d2) > 0]
+dim(d1)
+
+####
+add.words = setdiff(colnames(d22), colnames(d11))
+df_1 = data.frame(new_words = add.words, year =2006, stringsAsFactors = F)
+all_words = unique(c(colnames(d11)), colnames(d22))
+length(add.words)
+
+##loop for new words in all unigrams DTM
+for (k in 3:10){
+  d = as.matrix(readRDS(paste0('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\df',years[k],'.Rds')))
+  d = d[,colSums(d) > 0]
+  all_words = unique(c(all_words, colnames(d22)))
+  x = setdiff(colnames(d), all_words)
+  df1 = data.frame(new_words = x, year =years[k], stringsAsFactors = F)
+  df = rbind(df_1,df1)
+}
+```
+
+```{r}
+##finding new words from bigrams##
+d1_bi = as.matrix(readRDS('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\df_bigrams_2005.Rds')) 
+d2_bi = as.matrix(readRDS('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\df_bigrams_2006.Rds'))
+d11_bi = d1_bi[,colSums(d1_bi) > 0]
+d22_bi = d2_bi[,colSums(d2_bi) > 0]
+add.words_bigrams = setdiff(colnames(d22_bi), colnames(d11_bi))
+df_2 = data.frame(new_words = add.words_bigrams, year =2006, stringsAsFactors = F)
+all_words_bigrams = unique(c(colnames(d11_bi)), colnames(d22_bi))
+length(add.words_bigrams)
+dim(df_2)
+length(all_words_bigrams)
+
+
+## For loop for new words from Bigrams DTM##
+
+for (k in 3:10){
+  d = as.matrix(readRDS(paste0('C:\\Users\\Vineet\\Documents\\ISB-H\\TA\\GP\\df_bigrams_',years[k],'.Rds')))
+  d = d[,colSums(d) > 0]
+  all_words_bigrams = unique(c(all_words_bigrams, colnames(d22_bi)))
+  x = setdiff(colnames(d), all_words_bigrams)
+  df2 = data.frame(new_words = x, year =years[k], stringsAsFactors = F)
+  df_bigram = rbind(df_2,df2)
+}
+
+```
+
+```{r}
+####count of newwords in unigrams and making wordcloud and barchart of it
+require(plyr)
+count_words <- count(df,'year')
+
+freq_uni <- table(df$new_words)
+
+freq_uni <- as.data.frame(freq_uni)
+
+x <-print.data.frame(data.frame(freq_uni), 
+                 quote=FALSE)
+
+set.seed(1234)
+wordcloud(words = x$Var1, freq = x$Freq, min.freq = 50,
+          max.words=50, random.order=FALSE, rot.per=0.35, 
+          colors=c("gray20", "gray80"))
+
+barplot(x$Freq,  names.arg = x$Var1,
+        col ="lightblue", main ="Most frequent words",
+        ylab = "Word frequencies")
+```
+
+
+```{r}
+####Apple Company- new words for Apple Company in 2006
+d_Apple <- as.data.frame(d1)
+d_Apple_06<- as.data.frame(d2)
+x<- d_Apple[30,]
+x1 <- d_Apple_06[30,]
+d11_app = x[,colSums(x) > 0]
+d22_app = x1[,colSums(x1) > 0]
+
+add.words = setdiff(colnames(d22_app), colnames(d11_app))
+df_apple = data.frame(new_words = add.words, year =2006, stringsAsFactors = F)
+all_words_apple = unique(c(colnames(d11_app)), colnames(d22_app))
+length(all_words_apple)
+as.data.frame(table(all_words_apple)) %>% with(wordcloud(all_words_apple, Freq, max.words = 100))
+```
+
+
+```{r}
+##count of newwords in bigrams and making wordcloud and barchart of it
+require(plyr)
+count_words <- count(df_bigram,'year')
+freq_bi <- table(df_bigram$new_words)
+head(freq_bi)
+
+y<-print.data.frame(data.frame(freq_bi), 
+                     quote=FALSE)
+colnames(y)
+set.seed(1234)
+wordcloud(words = y$Var1, freq = y$Freq,scale = c(3.5, 0.5),
+          max.words=200, random.order=TRUE, rot.per=0.15, 
+          colors=brewer.pal(8, "Dark2"))
+
+
+
+```
+
+
+
+```{r}
+#Inference  -  Technology related words are shown in new words of Apple firm in 2006 as compared to 2005 -  Count of new words is 1842.
+
+###Inference of New Bigrams- compliance , offer include, database oracle, japan facilities- there are many more words. The count of new bigrams is 77616
+
+###Inference of new Unigrams -Count of New words in unigrams DTM is 4613 
+```
+
